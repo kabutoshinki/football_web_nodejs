@@ -1,7 +1,10 @@
 var bcrypt = require("bcryptjs");
 var jwt = require("jsonwebtoken");
 const User = require("../models/users");
+const Otp = require("../models/otp");
 const cloudinary = require("cloudinary").v2;
+const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 
 const register = async (req, res, next) => {
   try {
@@ -169,10 +172,186 @@ const updateProfile = async (req, res) => {
   }
 };
 
+function handleSendEmail(email, otp) {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: "hoanghuy1vip@gmail.com",
+      pass: "hpichzkexouzqifx",
+    },
+  });
+
+  const mailOptions = {
+    from: "hoanghuy1vip@gmail.com",
+    to: email,
+    subject: "Reset Password - OTP",
+    html: `<p>Your OTP is ${otp}. Use this to reset your password.</p>`,
+  };
+
+  transporter.sendMail(mailOptions, (error, info) => {
+    if (error) {
+      console.log(error);
+    } else {
+      console.log("Email sent: " + info.response);
+    }
+  });
+}
+
+const verifyEmail = async (req, res) => {
+  try {
+    const email = req.body.email;
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ error: "Email not found" });
+    }
+
+    const existingOtp = await Otp.findOne({ email });
+    if (existingOtp) {
+      // If OTP exists and is not expired, update the OTP and expiry time
+      const now = new Date();
+      const otp = crypto.randomInt(100000, 999999);
+      const salt = bcrypt.genSaltSync(10);
+      const hash = bcrypt.hashSync(String(otp), salt);
+      existingOtp.otp = hash;
+      existingOtp.time = new Date(now.getTime() + 1 * 60 * 1000);
+      await existingOtp.save();
+      handleSendEmail(email, otp);
+      return res.status(200).json({ message: "OTP updated" });
+    } else {
+      const now = new Date();
+      const expiryTime = new Date(now.getTime() + 5 * 60 * 1000);
+      const otp = crypto.randomInt(100000, 999999);
+      const salt = bcrypt.genSaltSync(10);
+      const hash = bcrypt.hashSync(String(otp), salt);
+      const newOtp = new Otp({ email, otp: hash });
+      await newOtp.save();
+      handleSendEmail(email, otp);
+      return res.status(200).json({ message: "OTP generated" });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Server error" });
+  }
+};
+
+const confirmOtp = async (req, res) => {
+  // Verify OTP
+  try {
+    const confirmOTP = req.body.otp;
+    const email = req.body.email;
+    const user = await User.findOne({ email });
+    const verifyOtp = await Otp.findOne({ email });
+
+    if (!user) {
+      return res.status(400).json({ message: "Email not found" });
+    }
+    if (!verifyOtp) {
+      return res.status(400).json({ message: "OTP invalid or expired" });
+    }
+
+    const isOtpCorrect = await bcrypt.compareSync(confirmOTP, verifyOtp.otp);
+    if (!isOtpCorrect) {
+      return res.status(400).json({ message: "OTP invalid or expired" });
+    } else {
+      return res.status(200).json({ message: "OTP verified", email: email });
+    }
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
+const resendOTP = async (req, res) => {
+  try {
+    const email = req.body.email;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      console.log("Email not found");
+      return res.status(400).json({ error: "Email not found" });
+    }
+
+    const now = new Date();
+    const existingOtp = await Otp.findOne({ email });
+
+    if (existingOtp) {
+      // If OTP exists and is not expired, update the OTP and expiry time
+      console.log("Existing OTP still valid");
+      const otp = crypto.randomInt(100000, 999999);
+      const salt = bcrypt.genSaltSync(10);
+      const hash = bcrypt.hashSync(String(otp), salt);
+      console.log(otp);
+      existingOtp.otp = hash;
+      existingOtp.time = new Date(now.getTime() + 1 * 60 * 1000);
+      await existingOtp.save();
+      console.log("update success");
+      handleSendEmail(email, otp);
+      res.status(200).json({ message: "Re-send OTP Success please wait felt minute" });
+    } else {
+      const otp = crypto.randomInt(100000, 999999);
+      const salt = bcrypt.genSaltSync(10);
+      const hash = bcrypt.hashSync(String(otp), salt);
+      const newOtp = new Otp({ email, otp: hash });
+      await newOtp.save();
+      handleSendEmail(email, otp);
+      console.log("success");
+      res.status(200).json({ message: "Re-send OTP Success please wait felt minute" });
+    }
+  } catch (error) {
+    console.log(error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+};
+
+const resetPassword = async (req, res) => {
+  try {
+    const newPassword = req.body.password;
+    const confirmPassword = req.body.password_confirm;
+    const email = req.body.email;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: "New password is too short" });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ error: "New password and confirm password do not match" });
+    }
+
+    const isPasswordCorrect = await bcrypt.compare(newPassword, user.password);
+    if (isPasswordCorrect) {
+      return res.status(400).json({ error: "New password cannot be the same as the current password" });
+    }
+
+    const salt = bcrypt.genSaltSync(10);
+    const hash = bcrypt.hashSync(newPassword, salt);
+    user.password = hash;
+    await user.save();
+
+    const checkOtpExist = await Otp.findOne({ email });
+    if (checkOtpExist) {
+      await Otp.deleteOne({ email });
+    }
+
+    return res.status(200).json({ message: "Reset password successfully" });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+};
+
 module.exports = {
   register,
   login,
   logout,
   profile,
   updateProfile,
+  verifyEmail,
+  confirmOtp,
+  resendOTP,
+  resetPassword,
 };

@@ -18,8 +18,24 @@ var app = express();
 dotenv.config();
 
 mongoose.set("strictQuery", false);
-const url = "mongodb://127.0.0.1:27017/footballDB";
+// const url = "mongodb://127.0.0.1:27017/footballDB";
+const url = "mongodb+srv://sdn:e1Gc6RA4FRM4iMI9@sdn.hkmti4p.mongodb.net/test";
 const connect = mongoose.connect(url);
+
+app.get("/", (req, res) => {
+  const html = `
+    <html>
+      <head>
+        <title>My Basic View</title>
+      </head>
+      <body>
+        <h1>Welcome to my basic view!</h1>
+        <p>This is some sample text.</p>
+      </body>
+    </html>
+  `;
+  res.send(html);
+});
 
 //middleware
 // const addUserDataToLocals = (req, res, next) => {
@@ -41,6 +57,7 @@ const connect = mongoose.connect(url);
 //   }
 //   next();
 // };
+
 app.use(cors());
 app.use(logger("dev"));
 app.use(cookieParser());
