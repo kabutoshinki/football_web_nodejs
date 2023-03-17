@@ -18,6 +18,7 @@ var app = express();
 dotenv.config();
 
 mongoose.set("strictQuery", false);
+
 //MongoDB
 // const url = "mongodb://127.0.0.1:27017/footballDB";
 const url = "mongodb+srv://sdn:e1Gc6RA4FRM4iMI9@sdn.hkmti4p.mongodb.net/test";
