@@ -200,6 +200,7 @@ function handleSendEmail(email, otp) {
 const verifyEmail = async (req, res) => {
   try {
     const email = req.body.email;
+    console.log(req.body);
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).json({ error: "Email not found" });
@@ -216,6 +217,7 @@ const verifyEmail = async (req, res) => {
       existingOtp.time = new Date(now.getTime() + 1 * 60 * 1000);
       await existingOtp.save();
       handleSendEmail(email, otp);
+      console.log(otp);
       return res.status(200).json({ message: "OTP updated" });
     } else {
       const now = new Date();
@@ -226,6 +228,7 @@ const verifyEmail = async (req, res) => {
       const newOtp = new Otp({ email, otp: hash });
       await newOtp.save();
       handleSendEmail(email, otp);
+      console.log(otp);
       return res.status(200).json({ message: "OTP generated" });
     }
   } catch (error) {
@@ -294,6 +297,7 @@ const resendOTP = async (req, res) => {
       const newOtp = new Otp({ email, otp: hash });
       await newOtp.save();
       handleSendEmail(email, otp);
+      console.log(otp);
       console.log("success");
       res.status(200).json({ message: "Re-send OTP Success please wait felt minute" });
     }
@@ -311,7 +315,7 @@ const resetPassword = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: "Email not found" });
     }
 
     if (newPassword.length < 6) {

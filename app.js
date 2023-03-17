@@ -18,8 +18,8 @@ var app = express();
 dotenv.config();
 
 mongoose.set("strictQuery", false);
-// const url = "mongodb://127.0.0.1:27017/footballDB";
-const url = "mongodb+srv://sdn:e1Gc6RA4FRM4iMI9@sdn.hkmti4p.mongodb.net/test";
+const url = "mongodb://127.0.0.1:27017/footballDB";
+// const url = "mongodb+srv://sdn:e1Gc6RA4FRM4iMI9@sdn.hkmti4p.mongodb.net/test";
 const connect = mongoose.connect(url);
 
 app.get("/", (req, res) => {
@@ -30,7 +30,7 @@ app.get("/", (req, res) => {
       </head>
       <body>
         <h1>Welcome to my basic view!</h1>
-        <p>This is some sample text.</p>
+        <p>This is API Football Web.</p>
       </body>
     </html>
   `;
